@@ -48,11 +48,36 @@ const getPostById = catchAsync(async (req: Request, res: Response, next: NextFun
     })
 })
 const updatePosts = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const postId = req.params.postId;
+    const payload = req.body;
+    const authorId = req.user?.id;
+    const isAdmin = req.user?.role === "ADMIN";
+    const result = await postService.updatePosts(postId as string, payload, authorId as string, isAdmin);
+    sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.OK,
+        message: "Post updated successfully",
+        data: { result }
+    })
 
 })
 const deletePost = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const postId = req.params.postId;
+    if (!postId) {
+        throw new Error("Post id required in params");
+    }
+    const authorId = req.user?.id;
+    const isAdmin = req.user?.role === "ADMIN";
+    await postService.deletePost(postId as string, authorId as string, isAdmin);
+    sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.OK,
+        message: "Post delete successfully",
+        data: null
+    })
 
 })
+
 
 
 export const postController = {

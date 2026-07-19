@@ -1,6 +1,6 @@
-import { PostStatus } from "../../../generated/prisma/enums"
+import { CommentStatus, PostStatus } from "../../../generated/prisma/enums"
 import { prisma } from "../../lib/prisma"
-import { ICreatePostPayload } from "./post.interface"
+import { ICreatePostPayload, IUpdatePostPayload } from "./post.interface"
 
 
 
@@ -59,12 +59,8 @@ const getMyPosts = async (authorId: string) => {
     return result;
 }
 const getPostById = async (postId: string) => {
-    const post = await prisma.post.findUniqueOrThrow({
-        where: {
-            id: postId
-        }
-    })
-    const updatedPost = await prisma.post.update({
+
+    await prisma.post.update({
         where: {
             id: postId
         },
@@ -72,7 +68,50 @@ const getPostById = async (postId: string) => {
             view: {
                 increment: 1
             }
+        }
+    })
+    // throw new Error("Fake Error")
+    const post = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: postId
         },
+        include: {
+            author: {
+                omit: {
+                    password: true
+                }
+            },
+            comment: {
+                where: {
+                    status: CommentStatus.APPROVED
+                },
+                orderBy: {
+                    createdAt: "desc"
+                }
+            },
+            _count: {
+                select: {
+                    comment: true
+                }
+            }
+        }
+    })
+    return post
+}
+const updatePosts = async (postId: string, payload: IUpdatePostPayload, authorId: string, isAdmin: boolean) => {
+    const post = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: postId
+        }
+    })
+    if (!isAdmin && post.authorId !== authorId) {
+        throw new Error("Your are not the owner of this post!")
+    }
+    const result = await prisma.post.update({
+        where: {
+            id: postId
+        },
+        data: payload,
         include: {
             author: {
                 omit: {
@@ -81,14 +120,23 @@ const getPostById = async (postId: string) => {
             },
             comment: true
         }
-
     })
-    return updatedPost
+    return result;
 }
-const updatePosts = async () => {
-
-}
-const deletePost = async () => {
+const deletePost = async (postId: string, authorId: string, isAdmin: boolean) => {
+    const post = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: postId
+        }
+    })
+    if (!isAdmin && post.authorId !== authorId) {
+        throw new Error("Your are not the owner of this post!")
+    }
+    await prisma.post.delete({
+        where: {
+            id: postId
+        }
+    })
 
 }
 
