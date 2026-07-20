@@ -212,6 +212,9 @@ const getAllPosts = async (query: IPostQuery) => {
         //         query.content ? { title: query.content } : {},
         //     ]
         // },
+        // where:{
+
+        // }
         where: {
             AND: andConditions
         },
