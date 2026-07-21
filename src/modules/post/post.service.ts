@@ -6,12 +6,28 @@ import { ICreatePostPayload, IPostQuery, IUpdatePostPayload } from "./post.inter
 
 
 const createPost = async (payload: ICreatePostPayload, userId: string) => {
+    const user = await prisma.post.findUniqueOrThrow({
+        where: {
+            id: userId
+        },
+        include: {
+            author: {
+                include: {
+                    subscription: true
+                }
+            }
+        }
+    })
+    if (payload.isPremium && user.author.subscription?.status !== "ACTIVE") {
+        throw new Error("you are not a premium user . so you can not create premium content");
+    }
     const result = await prisma.post.create({
         data: {
             title: payload.title,
             content: payload.content as string,
             thumbnail: payload.thumbnail || null,
             isFeatured: payload.isFeatured || false,
+            isPremium: payload.isPremium,
             status: payload.status || PostStatus.PUBLISHED,
             tags: payload.tags,
             authorId: userId
@@ -85,6 +101,10 @@ const getAllPosts = async (query: IPostQuery) => {
             status: query.status
         })
     }
+
+    andConditions.push({
+        isPremium: false
+    })
 
 
     const posts = await prisma.post.findMany({
@@ -237,7 +257,20 @@ const getAllPosts = async (query: IPostQuery) => {
             comment: true
         }
     })
-    return posts;
+    const totalPostCount = await prisma.post.count({
+        where: {
+            AND: andConditions
+        }
+    })
+    return {
+        data: posts,
+        meta: {
+            page: page,
+            limit: limit,
+            total: totalPostCount,
+            totalPages: Math.ceil(totalPostCount / limit)
+        }
+    };
 }
 const getPostStats = async () => {
     const transactionResult = await prisma.$transaction(
@@ -425,7 +458,7 @@ const getPostById = async (postId: string) => {
         async (tx) => {
             await tx.post.update({
                 where: {
-                    id: postId
+                    id: postId,
                 },
                 data: {
                     view: {
@@ -436,7 +469,8 @@ const getPostById = async (postId: string) => {
             // throw new Error("Fake Error")
             const post = await tx.post.findUniqueOrThrow({
                 where: {
-                    id: postId
+                    id: postId,
+                    isPremium: false
                 },
                 include: {
                     author: {
